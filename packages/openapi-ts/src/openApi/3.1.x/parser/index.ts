@@ -5,9 +5,10 @@ import {
   createFilters,
   hasFilters,
 } from '../../shared/utils/filter';
-import type { Graph } from '../../shared/utils/graph';
+import { buildGraph, type Graph } from '../../shared/utils/graph';
 import { mergeParametersObjects } from '../../shared/utils/parameter';
-import { hasTransforms } from '../../shared/utils/transform';
+import { enumsTransform } from '../../shared/utils/transforms/enums';
+import { readWriteTransform } from '../../shared/utils/transforms/readWrite';
 import { handleValidatorResult } from '../../shared/utils/validator';
 import type {
   OpenApiV3_1_X,
@@ -27,30 +28,40 @@ import { parseServers } from './server';
 
 export const parseV3_1_X = (context: IR.Context<OpenApiV3_1_X>) => {
   const shouldFilterSpec = hasFilters(context.config.parser.filters);
-  const shouldTransformSpec = hasTransforms(context.config.parser.transforms);
 
-  let graph: Graph | undefined;
+  let oldGraph: Graph | undefined;
+  const graph = buildGraph(context.spec);
 
-  if (
-    shouldFilterSpec ||
-    shouldTransformSpec ||
-    context.config.parser.validate_EXPERIMENTAL
-  ) {
+  if (shouldFilterSpec || context.config.parser.validate_EXPERIMENTAL) {
     const result = createGraph({
       spec: context.spec,
-      transforms: context.config.parser.transforms,
       validate: Boolean(context.config.parser.validate_EXPERIMENTAL),
     });
-    graph = result.graph;
+    oldGraph = result.graph;
     handleValidatorResult({ context, result });
   }
 
-  if (shouldFilterSpec && graph) {
+  if (shouldFilterSpec && oldGraph) {
     const filters = createFilters(context.config.parser.filters, context.spec);
-    const sets = createFilteredDependencies({ filters, graph });
+    const sets = createFilteredDependencies({ filters, graph: oldGraph });
     filterSpec({
       ...sets,
       preserveOrder: filters.preserveOrder,
+      spec: context.spec,
+    });
+  }
+
+  if (context.config.parser.transforms.enums.enabled) {
+    enumsTransform({
+      config: context.config.parser.transforms.enums,
+      spec: context.spec,
+    });
+  }
+
+  if (context.config.parser.transforms.readWrite.enabled) {
+    readWriteTransform({
+      config: context.config.parser.transforms.readWrite,
+      graph,
       spec: context.spec,
     });
   }

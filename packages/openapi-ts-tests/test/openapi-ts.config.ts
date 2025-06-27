@@ -102,10 +102,13 @@ export default defineConfig(() => {
         // version: () => '3.1.1',
       },
       transforms: {
-        enums: 'root',
+        enums: {
+          mode: 'inline',
+          // name: '{{name}}',
+        },
         readWrite: {
-          requests: '{{name}}Writable',
-          responses: '{{name}}',
+          // requests: '{{name}}',
+          responses: '{{name}}Readable',
         },
       },
       validate_EXPERIMENTAL: true,
@@ -125,17 +128,13 @@ export default defineConfig(() => {
       },
       {
         // case: 'snake_case',
-        // enums: 'javascript',
         enums: {
           // case: 'PascalCase',
           // constantsIgnoreNull: true,
-          // enabled: false,
+          enabled: false,
           type: 'typescript+namespace',
         },
         name: '@hey-api/typescript',
-        // readOnlyWriteOnlyBehavior: 'off',
-        // readableName: 'Readable{{name}}',
-        // writableName: 'Writable{{name}}',
         // tree: true,
       },
       {

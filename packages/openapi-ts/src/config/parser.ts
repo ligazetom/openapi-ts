@@ -17,7 +17,12 @@ export const getParser = (userConfig: UserConfig): Config['parser'] => {
       keywords: defaultPaginationKeywords,
     },
     transforms: {
-      enums: false,
+      enums: {
+        case: 'PascalCase',
+        enabled: true,
+        mode: 'root',
+        name: '{{name}}Enum',
+      },
       readWrite: {
         enabled: true,
         requests: {
@@ -38,9 +43,17 @@ export const getParser = (userConfig: UserConfig): Config['parser'] => {
       parser.pagination.keywords = userConfig.parser.pagination.keywords;
     }
 
-    if (userConfig.parser.transforms?.enums) {
-      parser.transforms.enums = userConfig.parser.transforms.enums;
-    }
+    parser.transforms.enums = valueToObject({
+      defaultValue: {
+        ...parser.transforms.enums,
+        enabled: Boolean(userConfig.parser.transforms?.enums),
+      },
+      mappers: {
+        boolean: (enabled) => ({ enabled }),
+        string: (mode) => ({ mode }),
+      },
+      value: userConfig.parser.transforms?.enums,
+    }) as typeof parser.transforms.enums;
 
     parser.transforms.readWrite = valueToObject({
       defaultValue: parser.transforms.readWrite,

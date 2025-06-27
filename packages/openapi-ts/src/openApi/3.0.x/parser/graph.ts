@@ -1,14 +1,14 @@
 import { createOperationKey } from '../../../ir/operation';
 import type { Config } from '../../../types/config';
-import { refToName, resolveRef } from '../../../utils/ref';
+import { refToName, refToPath, resolveRef } from '../../../utils/ref';
 import type { Graph } from '../../shared/utils/graph';
 import {
   addNamespace,
-  getUniqueComponentName,
   setAtPath,
   stringToNamespace,
 } from '../../shared/utils/graph';
 import { httpMethods } from '../../shared/utils/operation';
+import { getUniqueComponentName } from '../../shared/utils/spec';
 import type {
   ValidatorIssue,
   ValidatorResult,
@@ -36,8 +36,8 @@ const collectSchemaDependencies = ({
   spec: OpenApiV3_0_X;
   transforms: Config['parser']['transforms'];
 }) => {
-  if (transforms.enums) {
-    if (transforms.enums === 'root') {
+  if (transforms.enums.enabled) {
+    if (transforms.enums.mode === 'root') {
       if (!('$ref' in schema) && schema.enum) {
         if (
           path.length !== 3 ||
@@ -47,16 +47,16 @@ const collectSchemaDependencies = ({
           // Move the current schema to #/components/schemas and replace with $ref
           if (!spec.components) spec.components = {};
           if (!spec.components.schemas) spec.components.schemas = {};
-          const enumName = getUniqueComponentName(
-            spec.components.schemas,
-            String(path[path.length - 1]),
-          );
+          const enumName = getUniqueComponentName({
+            base: String(path[path.length - 1]),
+            components: spec.components.schemas,
+          });
           spec.components.schemas[enumName] = { ...schema };
           setAtPath(spec, path, { $ref: `#/components/schemas/${enumName}` });
           return;
         }
       }
-    } else if (transforms.enums === 'inline') {
+    } else if (transforms.enums.mode === 'inline') {
       if ('$ref' in schema) {
         // Copy the referenced enum schema and remove $ref from the current schema
         const refSchema = resolveRef<SchemaObject>({ $ref: schema.$ref, spec });
@@ -73,9 +73,9 @@ const collectSchemaDependencies = ({
   }
 
   if ('$ref' in schema) {
-    const parts = schema.$ref.split('/');
-    const type = parts[parts.length - 2];
-    const name = parts[parts.length - 1];
+    const refPath = refToPath(schema.$ref);
+    const type = refPath[refPath.length - 2];
+    const name = refPath[refPath.length - 1];
     if (type && name) {
       const namespace = stringToNamespace(type);
       if (namespace === 'unknown') {
@@ -188,15 +188,32 @@ const collectSchemaDependencies = ({
 
 export const createGraph = ({
   spec,
-  transforms,
   validate,
 }: {
   spec: OpenApiV3_0_X;
-  transforms: Config['parser']['transforms'];
   validate: boolean;
 }): ValidatorResult & {
   graph: Graph;
 } => {
+  const transforms: Config['parser']['transforms'] = {
+    enums: {
+      case: 'PascalCase',
+      enabled: false,
+      mode: 'root',
+      name: '{{name}}Enum',
+    },
+    readWrite: {
+      enabled: false,
+      requests: {
+        case: 'preserve',
+        name: '',
+      },
+      responses: {
+        case: 'preserve',
+        name: '',
+      },
+    },
+  };
   const graph: Graph = {
     operations: new Map(),
     parameters: new Map(),
